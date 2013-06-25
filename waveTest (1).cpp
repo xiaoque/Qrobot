@@ -18,8 +18,7 @@
 typedef int SR_DWORD;
 typedef short int SR_WORD ;
 
-bool m_record ,first_write;
-
+bool m_record;  //record status
 static int buf_count = 0;
 static int dwDataLength  = 0;
 PBYTE pSaveBuffer ,pNewBuffer;   // buffer address 
@@ -73,21 +72,18 @@ struct wave_pcm_hdr default_pcmwavhdr =
 int main()
 {
 	/* 录音 */
-	HWAVEIN hWaveIn;   //input handle
-   WAVEFORMATEX waveform;//wave form
-	WAVEINCAPS wic;        // input device
+	HWAVEIN hWaveIn;              //input handle
+	WAVEFORMATEX waveform;        //wave form
+	WAVEINCAPS wic;               // input device
 	PBYTE pBuffer1 ,pBuffer2;      // input buffer
-
-
-	HWAVEOUT hWaveOut;     //ouput handle
-	PWAVEHDR pWaveHdr1 ,pWaveHdr2 ;
-	WAVEHDR wavhdr;      //ouput data buffer
+	PWAVEHDR pWaveHdr1 ,pWaveHdr2 ;// input buffer header
 
 
 	pWaveHdr1=reinterpret_cast<PWAVEHDR>(malloc(sizeof(WAVEHDR)));
 	pWaveHdr2=reinterpret_cast<PWAVEHDR>(malloc(sizeof(WAVEHDR))); //给声音文件头分配内存空间
 	pSaveBuffer = reinterpret_cast<PBYTE>(malloc(1));    //给数据内存地址分配空间
 
+	m_record = false;
 	// Device
 	int nReturn = waveInGetNumDevs();
 	printf("输入设备数目：%d\n", nReturn);
@@ -97,8 +93,8 @@ int main()
 		printf("#%d\t设备名：%s\n", i, wic.szPname);
 	}
 
-	// open
 
+	//set wave form 
 	waveform.wFormatTag = WAVE_FORMAT_PCM;
 	waveform.nChannels = 1;
 	waveform.nSamplesPerSec = 16000;
@@ -108,8 +104,6 @@ int main()
 	waveform.cbSize = 0;
 
 	waveInOpen(&hWaveIn, WAVE_MAPPER, &waveform, (DWORD_PTR)waveInProc, NULL, CALLBACK_FUNCTION);
-
-
 	waveInGetDevCaps((UINT_PTR)hWaveIn, &wic, sizeof(WAVEINCAPS));
 	printf("打开的输入设备：%s\n", wic.szPname);
 
@@ -117,6 +111,7 @@ int main()
 	m_record=true;
 	pBuffer1=(PBYTE)malloc(BUFFER_SIZE);
 	pBuffer2=(PBYTE)malloc(BUFFER_SIZE);    //给缓冲区分配空间
+	
 	if (!pBuffer1||!pBuffer2)
 	{
 		if (pBuffer1) free(pBuffer1);
@@ -145,10 +140,7 @@ int main()
 	pWaveHdr2->lpNext=NULL;
 	pWaveHdr2->reserved=0;
 
-  
 	pSaveBuffer = (PBYTE)realloc (pSaveBuffer, 1) ;
-
-
 
 	// record
 	printf ("Press any key to start recording...\n");
@@ -156,59 +148,51 @@ int main()
 	waveInPrepareHeader(hWaveIn,pWaveHdr1,sizeof(WAVEHDR));  //将缓冲区信息和输入设备关联
 	waveInAddBuffer(hWaveIn, pWaveHdr1, sizeof (WAVEHDR)) ; //将缓冲区地址添加到输入设备中
 	waveInPrepareHeader(hWaveIn,pWaveHdr2,sizeof(WAVEHDR));
-	waveInAddBuffer (hWaveIn, pWaveHdr2, sizeof (WAVEHDR)) ; //d...\n");
+	waveInAddBuffer (hWaveIn, pWaveHdr2, sizeof (WAVEHDR)) ; //
 	printf("Start Record!\n\n");
 
-	buf_count = 0;
 	m_record = true;
 	waveInStart(hWaveIn);
 
 
 	printf ("Press any key to stop recording...\n");
-    getch();
+    getch();	
+	printf("Record Over!\n\n");
 	
-	printf("Record Over!\n\n");/*
-	if(buf_count==0)
-	{
-		FILE * fp = fopen("E:\\ecord.pcm","ab+");
-		if(fp==NULL)
-		{
-			printf("file open error");
-		}
-		
-		pNewBuffer = (PBYTE)realloc (pSaveBuffer, dwDataLength + pWaveHdr1->dwBytesRecorded) ;
-		pSaveBuffer = pNewBuffer;
-		CopyMemory(pSaveBuffer + dwDataLength, pWaveHdr1->lpData,pWaveHdr1->dwBytesRecorded);
-		dwDataLength += pWaveHdr1->dwBytesRecorded;
 
-		pNewBuffer = (PBYTE)realloc (pSaveBuffer, dwDataLength + pWaveHdr2->dwBytesRecorded) ;
-		pSaveBuffer = pNewBuffer;
-		CopyMemory(pSaveBuffer + dwDataLength, pWaveHdr2->lpData,pWaveHdr2->dwBytesRecorded);
-		dwDataLength += pWaveHdr2->dwBytesRecorded;
-
-		fwrite(pWaveHdr1->lpData,pWaveHdr1->dwBytesRecorded,1,fp);
-		fwrite(pWaveHdr2->lpData,pWaveHdr2->dwBytesRecorded,1,fp);
-
-		fclose(fp);
-	}
-	*/
 	free(pBuffer1);
 	free(pBuffer2);
 
 	// clean
 	waveInStop(hWaveIn);
-	//waveInReset(hWaveIn);
-//_record  = false;
 	waveInClose(hWaveIn);
 
-	system("pause");
-	printf("\n");
+	//write file
 
 
-	return 0;
+	FILE * File = fopen("E:\\ecord.pcm","ab+");
+	FILE * WAVFile = fopen("E:\\record.wav","ab+");	
+
+	if(File==NULL || WAVFile ==NULL)
+	{
+		printf("file error");
+		return 0;
+	}
+
+	//write pcm file
+	fwrite(pSaveBuffer,1,dwDataLength, File);
+	fclose(File);
+
+	//write wave file
+
+	default_pcmwavhdr.data_size += dwDataLength ; //change file header 
+	default_pcmwavhdr.size_8 = default_pcmwavhdr.data_size + 36;
+	fwrite(&default_pcmwavhdr,1,sizeof(default_pcmwavhdr), WAVFile); //write wave file
+	fwrite(pSaveBuffer,1,dwDataLength, WAVFile);
+	fclose(WAVFile);
+
 }
 
-// 录音回调函数
 void CALLBACK waveInProc(HWAVEIN hwi,      
 						 UINT uMsg,         
 						 DWORD_PTR dwInstance,  
@@ -219,33 +203,31 @@ void CALLBACK waveInProc(HWAVEIN hwi,
 
 	if ((WIM_DATA==uMsg) && (buf_count<BUFFER_SIZE))
 	{
-		pNewBuffer = (PBYTE)realloc (pSaveBuffer, dwDataLength + pwh->dwBytesRecorded) ; 
+
+		int size = pwh->dwBytesRecorded;
+
+		//relocated memory location
+		pNewBuffer = (PBYTE)realloc (pSaveBuffer, dwDataLength+ size) ; 
+
 		if(pNewBuffer ==NULL)
 		{
 			waveInClose(hwi);
 			printf("memory error");
 			return;
 		}
+
+		//copy data into memory and refresh memory address
 		pSaveBuffer = pNewBuffer;
 		buf_count ++;
-		CopyMemory(pSaveBuffer + dwDataLength, pwh->lpData,pwh->dwBytesRecorded);
-		dwDataLength += pwh->dwBytesRecorded;
+		CopyMemory(pSaveBuffer + dwDataLength, pwh->lpData,size);
+		dwDataLength += size;
 
 		if(!m_record)
 		{
 			waveInClose(hwi);
 			printf("stop recording");
 			return;
-		}
-
-		FILE * fp = fopen("E:\\ecord.pcm","ab+");
-		if(fp==NULL)
-		{
-			printf("file open error");
-		}
-		fwrite(pwh->lpData,pwh->dwBytesRecorded,1,fp);
-		fclose(fp);
-				
+		}		
 		waveInAddBuffer(hwi, pwh, sizeof(WAVEHDR));
 	}
 }
