@@ -28,11 +28,14 @@ void CALLBACK waveInProc(HWAVEIN hwi,
 						 DWORD_PTR dwInstance,  
 						 DWORD_PTR dwParam1,  
 						 DWORD_PTR dwParam2     );
+
+/*
 void CALLBACK waveOutProc(  HWAVEOUT hwo,   
 						  UINT uMsg,         
 						  DWORD_PTR dwInstance,   
 						  DWORD_PTR dwParam1,    
 						  DWORD_PTR dwParam2     );
+*/
 
 struct wave_pcm_hdr
 {
