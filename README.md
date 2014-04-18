@@ -1,3 +1,3 @@
 qrobot2
 =======
-simple project developed with QRobot
+simple project developed using QRobot
